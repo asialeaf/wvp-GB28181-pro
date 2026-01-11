@@ -25,14 +25,22 @@ jobs:
           node-version: '20.x'
 
       - name: Clean Maven cache
-        run: |
-          rm -rf ~/.m2/repository/io/github/git-commit-id
-          rm -rf ~/.m2/repository/org/eclipse/jgit
+        run: rm -rf ~/.m2/repository/io/github/git-commit-id
 
       - name: Build Backend
         run: |
-          mvn dependency:resolve -DskipTests
-          mvn clean package -DskipTests -U
+          mvn clean package -DskipTests
+
+      - name: View target directory
+        run: |
+          echo "=== Target directory structure ==="
+          ls -lah target/ || echo "target directory not found"
+          echo ""
+          echo "=== JAR files in target ==="
+          ls -lh target/*.jar 2>/dev/null || echo "No JAR files found"
+          echo ""
+          echo "=== Target directory size ==="
+          du -sh target/ 2>/dev/null || echo "Cannot calculate size"
 
       - name: Compile frontend
         run: |
