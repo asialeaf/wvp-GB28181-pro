@@ -1,0 +1,87 @@
+name: Docker Build Frontend
+
+on:
+  push:
+    branches:
+      - dev_asialeaf # 推送到 dev_asialeaf 分支时触发
+  workflow_dispatch: # 允许手动触发
+
+jobs:
+  build-docker-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Compile frontend
+        run: |
+          cd ./web
+          npm install --registry=https://registry.npmmirror.com
+          npm run build:prod
+          cd ../
+
+      - name: View static directory
+        run: |
+          echo "=== Static directory structure ==="
+          ls -lah src/main/resources/static/ || echo "static directory not found"
+          echo ""
+          echo "=== Static directory size ==="
+          du -sh src/main/resources/static/ 2>/dev/null || echo "Cannot calculate size"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Create Dockerfile
+        run: |
+          cat > Dockerfile.nginx.tmp << 'EOF'
+          FROM nginx:alpine
+
+          ARG TZ=Asia/Shanghai
+
+          # 复制编译好的静态资源
+          COPY src/main/resources/static /opt/dist
+
+          # 复制 nginx 配置文件模板
+          COPY docker/nginx/templates/nginx.conf.template /etc/nginx/templates/default.conf.template
+
+          # 复制 config.js 到 dist/static/js/
+          COPY docker/nginx/config.js /opt/dist/static/js/config.js
+
+          CMD ["nginx", "-g", "daemon off;"]
+          EOF
+          cat Dockerfile.nginx.tmp
+
+      - name: Extract tag name
+        id: tag
+        run: |
+          # 使用 commit SHA 的短版本作为标签
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          TAG_NAME="dev-${SHORT_SHA}"
+          echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "Tag name: $TAG_NAME"
+
+      - name: Login to Docker Hub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.nginx.tmp
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/wvp-nginx:${{ steps.tag.outputs.tag }}
+            ${{ secrets.DOCKER_USERNAME }}/wvp-nginx:latest
+          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/wvp-nginx:buildcache
+          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/wvp-nginx:buildcache,mode=max
+          platforms: linux/amd64
+
