@@ -2,8 +2,8 @@ name: Docker Build
 
 on:
   push:
-    tags:
-      - "v*.*.*" # 触发条件是推送标签 如git tag v2.7.4 git push origin v2.7.4
+    branches:
+      - dev_asialeaf # 推送到 dev_asialeaf 分支时触发
   workflow_dispatch: # 允许手动触发
 
 jobs:
@@ -68,11 +68,9 @@ jobs:
       - name: Extract tag name
         id: tag
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            TAG_NAME="${GITHUB_REF#refs/tags/}"
-          else
-            TAG_NAME="latest"
-          fi
+          # 使用 commit SHA 的短版本作为标签
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          TAG_NAME="dev-${SHORT_SHA}"
           echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
           echo "Tag name: $TAG_NAME"
 
