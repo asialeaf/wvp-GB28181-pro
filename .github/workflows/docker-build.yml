@@ -53,12 +53,11 @@ jobs:
           # 复制配置文件
           COPY docker/wvp/wvp ./
           
-          # 复制静态资源
-          COPY src/main/resources/static ./static
-          
           # 暴露端口
-          # HTTP 端口（默认 18080）
-          EXPOSE 18080
+          EXPOSE 18978/tcp
+          EXPOSE 8116/tcp
+          EXPOSE 8116/udp
+          EXPOSE 8080/tcp
           
           ENTRYPOINT ["java", "-Xms512m", "-Xmx1024m", "-XX:+HeapDumpOnOutOfMemoryError", "-XX:HeapDumpPath=/opt/ylcx/", "-jar", "app.jar", "--spring.config.location=/app/application.yml"]
           EOF
