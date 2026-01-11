@@ -80,10 +80,7 @@ services:
     ]
 
   polaris-wvp:
-    # 显式指定构建上下文和Dockerfile路径
-    build:
-      context: ..  # 构建上下文的根路径
-      dockerfile: ./docker/wvp/Dockerfile  # 相对于上下文路径的Dockerfile位置
+    image: asialeaf/wvp-pro:latest
     restart: always
     networks:
       - media-net
