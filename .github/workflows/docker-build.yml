@@ -66,9 +66,11 @@ jobs:
       - name: Extract tag name
         id: tag
         run: |
-          # 使用 commit SHA 的短版本作为标签
-          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-          TAG_NAME="dev-${SHORT_SHA}"
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG_NAME="${GITHUB_REF#refs/tags/}"
+          else
+            TAG_NAME="latest"
+          fi
           echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
           echo "Tag name: $TAG_NAME"
 
