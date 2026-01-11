@@ -1,0 +1,98 @@
+name: Docker Build
+
+on:
+  push:
+    tags:
+      - "v*.*.*" # 触发条件是推送标签 如git tag v2.7.4 git push origin v2.7.4
+  workflow_dispatch: # 允许手动触发
+
+jobs:
+  build-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Clean Maven cache
+        run: rm -rf ~/.m2/repository/io/github/git-commit-id
+
+      - name: Build Backend
+        run: |
+          mvn clean package -DskipTests
+
+      - name: Compile frontend
+        run: |
+          cd ./web
+          npm install
+          npm run build:prod
+          cd ../
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Create Dockerfile
+        run: |
+          cat > Dockerfile.tmp << 'EOF'
+          FROM eclipse-temurin:21-jre-jammy
+          
+          WORKDIR /app
+          
+          # 复制 JAR 文件
+          COPY target/*.jar app.jar
+          
+          # 复制配置文件（如果存在）
+          COPY target/application*.yml ./
+          
+          # 复制静态资源
+          COPY src/main/resources/static ./static
+          
+          # 暴露端口
+          # HTTP 端口（默认 18080）
+          EXPOSE 18080
+          
+          ENTRYPOINT ["java", "-jar", "app.jar"]
+          EOF
+          cat Dockerfile.tmp
+
+      - name: Extract tag name
+        id: tag
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG_NAME="${GITHUB_REF#refs/tags/}"
+          else
+            TAG_NAME="latest"
+          fi
+          echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "Tag name: $TAG_NAME"
+
+      - name: Login to Docker Hub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.tmp
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/wvp-pro:${{ steps.tag.outputs.tag }}
+            ${{ secrets.DOCKER_USERNAME }}/wvp-pro:latest
+          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/wvp-pro:buildcache
+          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/wvp-pro:buildcache,mode=max
+          platforms: linux/amd64
+
