@@ -25,11 +25,14 @@ jobs:
           node-version: '20.x'
 
       - name: Clean Maven cache
-        run: rm -rf ~/.m2/repository/io/github/git-commit-id
+        run: |
+          rm -rf ~/.m2/repository/io/github/git-commit-id
+          rm -rf ~/.m2/repository/org/eclipse/jgit
 
       - name: Build Backend
         run: |
-          mvn clean package -DskipTests
+          mvn dependency:resolve -DskipTests
+          mvn clean package -DskipTests -U
 
       - name: Compile frontend
         run: |
